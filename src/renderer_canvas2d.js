@@ -49,37 +49,24 @@ const COLOR_PALETTE = [
   '#ffe119', '#911eb4', '#bfef45', '#f032e6', '#3cb44b', '#a9a9a9'
 ];
 export class RendererCanvas2d {
-  constructor(canvas) {
-    this.ctx = canvas.getContext('2d');
-    this.scatterGLEl = document.querySelector('#scatter-gl-container');
-    this.scatterGL = new scatter.ScatterGL(this.scatterGLEl, {
-      'rotateOnStart': true,
-      'selectEnabled': false,
-      'styles': {polyline: {defaultOpacity: 1, deselectedOpacity: 1}}
-    });
-    this.scatterGLHasInitialized = false;
-    this.videoWidth = canvas.width;
-    this.videoHeight = canvas.height;
+  constructor(canvas_frame, canvas_subframes) {
+    this.canvas_frame = canvas_frame.getContext('2d');
+    this.canvas_subframes = canvas_subframes.getContext('2d');
+    this.canvasContainer = document.querySelector(".canvas-wrapper");
+    this.videoWidth = canvas_frame.width;
+    this.videoHeight = canvas_frame.height;
     this.filteredAttentionScore = 0;
-    // this.flip(this.videoWidth, this.videoHeight);
   }
 
   flip(videoWidth, videoHeight) {
     // Because the image from camera is mirrored, need to flip horizontally.
-    this.ctx.translate(videoWidth, 0);
-    this.ctx.scale(-1, 1);
-
-    this.scatterGLEl.style =
-        `width: ${videoWidth}px; height: ${videoHeight}px;`;
-    this.scatterGL.resize();
-
-    this.scatterGLEl.style.display =
-        params.STATE.modelConfig.render3D ? 'inline-block' : 'none';
+    this.canvas_frame.translate(videoWidth, 0);
+    this.canvas_frame.scale(-1, 1);
   }
 
   draw(rendererParams) {
-    const [video, poses, isModelChanged] = rendererParams;
-    this.drawCtx(video);
+    const [camera, poses, isModelChanged] = rendererParams;
+    this.drawCtx(camera);
 
     // The null check makes sure the UI is not in the middle of changing to a
     // different model. If during model change, the result is from an old model,
@@ -92,16 +79,43 @@ export class RendererCanvas2d {
     }
   }
 
-  drawCtx(video) {
-    // this.ctx.save();
-    // this.ctx.scale(-1, 1);
-    // this.ctx.drawImage(video, 0, 0, -this.videoWidth, this.videoHeight);
-    // this.ctx.restore();
-    this.ctx.drawImage(video, 0, 0, this.videoWidth, this.videoHeight);
+  drawCtx(camera) {
+    this.canvas_frame.drawImage(
+      camera.frame,
+      0,
+      0,
+      camera.frame.width,
+      camera.frame.height
+    );
+
+    // Draw subimages below the main image in a row with 10px spacing
+
+    for (let i = 0; i < camera.subframes.images.length; i++) {
+      const subImg = camera.subframes.images[i];
+      this.canvas_subframes.drawImage(
+        subImg,
+        i * (subImg.width + 0),
+        0,
+        subImg.width,
+        subImg.height
+      );
+
+      // Draw bounding boxes in original image saved in subImg.boundingBox
+      this.canvas_frame.strokeStyle = "red";
+      this.canvas_frame.lineWidth = 2;
+      this.canvas_frame.strokeRect(
+        camera.subframes.boundingBoxes[i][0],
+        camera.subframes.boundingBoxes[i][1],
+        camera.subframes.boundingBoxes[i][2] -
+          camera.subframes.boundingBoxes[i][0],
+        camera.subframes.boundingBoxes[i][3] -
+          camera.subframes.boundingBoxes[i][1]
+      );
+    }
   }
 
   clearCtx() {
-    this.ctx.clearRect(0, 0, this.videoWidth, this.videoHeight);
+    this.canvas_frame.clearRect(0, 0, this.videoWidth, this.videoHeight);
   }
 
   filterAttntionScore(poses) {
@@ -128,8 +142,8 @@ export class RendererCanvas2d {
 
   drawGlobalAttention(poses) {
     const averageAttentionScore = this.filteredAttentionScore;
-    this.ctx.font = '20px Arial';
-    this.ctx.fillStyle = 'red';
+    this.canvas_frame.font = '20px Arial';
+    this.canvas_frame.fillStyle = 'red';
     // this.ctx.fillText(`Average Attention: ${averageAttentionScore.toFixed(0)} %`, 10, 30);
 
     // Define bar dimensions
@@ -141,8 +155,8 @@ export class RendererCanvas2d {
 
     // Draw the bar outline
     // Draw background of the bar (gray)
-    this.ctx.fillStyle = '#ccc';
-    this.ctx.fillRect(barX, barY, barWidth, barHeight);
+    this.canvas_frame.fillStyle = '#ccc';
+    this.canvas_frame.fillRect(barX, barY, barWidth, barHeight);
 
     if (poses == undefined) {
       return;
@@ -153,8 +167,8 @@ export class RendererCanvas2d {
     // calcualte color based on attention score form red to green
     const r = Math.floor(255 * (1 - averageAttentionScore / 100));
     const g = Math.floor(255 * (averageAttentionScore / 100));
-    this.ctx.fillStyle = `rgb(${r}, ${g}, 0)`;
-    this.ctx.fillRect(barX, barY, attentionBarWidth, barHeight);
+    this.canvas_frame.fillStyle = `rgb(${r}, ${g}, 0)`;
+    this.canvas_frame.fillRect(barX, barY, attentionBarWidth, barHeight);
 
     // // Draw a border around the bar
     // this.ctx.strokeStyle = 'black';
@@ -166,14 +180,10 @@ export class RendererCanvas2d {
    * @param pose A pose with keypoints to render.
    */
   drawResult(pose) {
-    console.log(pose);
     if (pose.keypoints != null) {
       this.drawKeypoints(pose.keypoints);
       this.drawSkeleton(pose.keypoints, pose.id);
       this.drawAttention(pose);
-    }
-    if (pose.keypoints3D != null && params.STATE.modelConfig.render3D) {
-      this.drawKeypoints3D(pose.keypoints3D);
     }
   }
 
@@ -184,20 +194,20 @@ export class RendererCanvas2d {
   drawKeypoints(keypoints) {
     const keypointInd =
         posedetection.util.getKeypointIndexBySide(params.STATE.model);
-    this.ctx.fillStyle = 'Red';
-    this.ctx.strokeStyle = 'White';
-    this.ctx.lineWidth = params.DEFAULT_LINE_WIDTH;
+    this.canvas_frame.fillStyle = 'Red';
+    this.canvas_frame.strokeStyle = 'White';
+    this.canvas_frame.lineWidth = params.DEFAULT_LINE_WIDTH;
 
     for (const i of keypointInd.middle) {
       this.drawKeypoint(keypoints[i]);
     }
 
-    this.ctx.fillStyle = 'Green';
+    this.canvas_frame.fillStyle = 'Green';
     for (const i of keypointInd.left) {
       this.drawKeypoint(keypoints[i]);
     }
 
-    this.ctx.fillStyle = 'Orange';
+    this.canvas_frame.fillStyle = 'Orange';
     for (const i of keypointInd.right) {
       this.drawKeypoint(keypoints[i]);
     }
@@ -216,8 +226,8 @@ export class RendererCanvas2d {
     if (score >= scoreThreshold) {
       const circle = new Path2D();
       circle.arc(keypoint.x, keypoint.y, params.DEFAULT_RADIUS, 0, 2 * Math.PI);
-      this.ctx.fill(circle);
-      this.ctx.stroke(circle);
+      this.canvas_frame.fill(circle);
+      this.canvas_frame.stroke(circle);
     }
   }
 
@@ -233,8 +243,8 @@ export class RendererCanvas2d {
     const tilt = orientation.tilt;
 
     // Draw yaw and mirror it
-    this.ctx.font = '20px Arial';
-    this.ctx.fillStyle = 'red';
+    this.canvas_frame.font = '20px Arial';
+    this.canvas_frame.fillStyle = 'red';
     // this.ctx.fillText(`Yaw: ${yaw.toFixed(0)} degrees`, nose.x, nose.y);
     // this.ctx.fillText(`Tilt: ${tilt.toFixed(0)} degrees`, nose.x, nose.y +
     //     30);
@@ -249,9 +259,9 @@ export class RendererCanvas2d {
     const color = params.STATE.modelConfig.enableTracking && poseId != null ?
         COLOR_PALETTE[poseId % 20] :
         'White';
-    this.ctx.fillStyle = color;
-    this.ctx.strokeStyle = color;
-    this.ctx.lineWidth = params.DEFAULT_LINE_WIDTH;
+    this.canvas_frame.fillStyle = color;
+    this.canvas_frame.strokeStyle = color;
+    this.canvas_frame.lineWidth = params.DEFAULT_LINE_WIDTH;
 
     posedetection.util.getAdjacentPairs(params.STATE.model).forEach(([
                                                                       i, j
@@ -269,48 +279,11 @@ export class RendererCanvas2d {
       const scoreThreshold = params.STATE.modelConfig.scoreThreshold || 0;
 
       if (score1 >= scoreThreshold && score2 >= scoreThreshold) {
-        this.ctx.beginPath();
-        this.ctx.moveTo(kp1.x, kp1.y);
-        this.ctx.lineTo(kp2.x, kp2.y);
-        this.ctx.stroke();
+        this.canvas_frame.beginPath();
+        this.canvas_frame.moveTo(kp1.x, kp1.y);
+        this.canvas_frame.lineTo(kp2.x, kp2.y);
+        this.canvas_frame.stroke();
       }
     });
-  }
-
-  drawKeypoints3D(keypoints) {
-    const scoreThreshold = params.STATE.modelConfig.scoreThreshold || 0;
-    const pointsData =
-        keypoints.map(keypoint => ([-keypoint.x, -keypoint.y, -keypoint.z]));
-
-    const dataset =
-        new scatter.ScatterGL.Dataset([...pointsData, ...ANCHOR_POINTS]);
-
-    const keypointInd =
-        posedetection.util.getKeypointIndexBySide(params.STATE.model);
-    this.scatterGL.setPointColorer((i) => {
-      if (keypoints[i] == null || keypoints[i].score < scoreThreshold) {
-        // hide anchor points and low-confident points.
-        return '#ffffff';
-      }
-      if (i === 0) {
-        return '#ff0000' /* Red */;
-      }
-      if (keypointInd.left.indexOf(i) > -1) {
-        return '#00ff00' /* Green */;
-      }
-      if (keypointInd.right.indexOf(i) > -1) {
-        return '#ffa500' /* Orange */;
-      }
-    });
-
-    if (!this.scatterGLHasInitialized) {
-      this.scatterGL.render(dataset);
-    } else {
-      this.scatterGL.updateDataset(dataset);
-    }
-    const connections = posedetection.util.getAdjacentPairs(params.STATE.model);
-    const sequences = connections.map(pair => ({indices: pair}));
-    this.scatterGL.setSequences(sequences);
-    this.scatterGLHasInitialized = true;
   }
 }

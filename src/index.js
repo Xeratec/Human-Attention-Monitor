@@ -28,8 +28,7 @@ tfjsWasm.setWasmPaths(
 
 import * as posedetection from '@tensorflow-models/pose-detection';
 
-import {Camera} from './camera';
-import {RendererWebGPU} from './renderer_webgpu';
+import {Camera} from './websocket';
 import {RendererCanvas2d} from './renderer_canvas2d';
 import {setupDatGui} from './option_panel';
 import {STATE} from './params';
@@ -89,7 +88,7 @@ async function createDetector() {
 
 async function checkGuiUpdate() {
   if (STATE.isTargetFPSChanged || STATE.isSizeOptionChanged) {
-    camera = await Camera.setupCamera(STATE.camera);
+    camera = await Camera.setupCamera(STATE.websocket);
     STATE.isTargetFPSChanged = false;
     STATE.isSizeOptionChanged = false;
   }
@@ -141,15 +140,13 @@ function endEstimatePosesStats() {
 }
 
 async function renderResult() {
-  if (camera.video.readyState < 2) {
-    await new Promise((resolve) => {
-      camera.video.onloadeddata = () => {
-        resolve(video);
-      };
-    });
-  }
+  await new Promise((resolve) => {
+    camera.onframe = () => {
+      resolve();
+    };
+  });
 
-  let poses = null;
+  let poses = [];
   let canvasInfo = null;
 
   // Detector can be null if initialization failed (for example when loading
@@ -164,21 +161,26 @@ async function renderResult() {
     // Detectors can throw errors, for example when using custom URLs that
     // contain a model that doesn't provide the expected output.
     try {
-      if (useGpuRenderer) {
-        const [posesTemp, canvasInfoTemp] = await detector.estimatePosesGPU(
-            camera.video,
-            {maxPoses: STATE.modelConfig.maxPoses, flipHorizontal: false},
-            true);
-        poses = posesTemp;
-        canvasInfo = canvasInfoTemp;
-      } else {
-        poses = await detector.estimatePoses(
-            camera.video,
-            {maxPoses: STATE.modelConfig.maxPoses, flipHorizontal: false});
-
-        // console.log(poses)
+      for (let i = 0; i < camera.subframes.images.length; i++) {
+        const subImage = camera.subframes.images[i];
+        const pose = await detector.estimatePoses(subImage, {
+          maxPoses: STATE.modelConfig.maxPoses,
+          flipHorizontal: false,
+        });
+        if (pose.length > 1) {
+          // Push all poses in the subimage to the poses array and transform the keypoints to the original image coordinates
+          pose.map((p) => {
+            p.keypoints.map((keypoint) => {
+              keypoint.x += camera.subframes.boundingBoxes[i][0];
+              keypoint.y += camera.subframes.boundingBoxes[i][1];
+            });
+            poses.push(p);
+            
+          });
+        }
       }
-
+      // console.log(poses);
+          
     } catch (error) {
       detector.dispose();
       detector = null;
@@ -194,8 +196,8 @@ async function renderResult() {
     endEstimatePosesStats();
   }
   const rendererParams = useGpuRenderer ?
-      [camera.video, poses, canvasInfo, STATE.modelConfig.scoreThreshold] :
-      [camera.video, poses, STATE.isModelChanged];
+      [camera, poses, canvasInfo, STATE.modelConfig.scoreThreshold] :
+      [camera, poses, STATE.isModelChanged];
   renderer.draw(rendererParams);
 }
 
@@ -313,20 +315,20 @@ async function app() {
   const isWebGPU = STATE.backend === 'tfjs-webgpu';
   const importVideo = (urlParams.get('importVideo') === 'true') && isWebGPU;
 
-  camera = await Camera.setup(STATE.camera);
+  camera = await Camera.setup(STATE.websocket);
 
   await setBackendAndEnvFlags(STATE.flags, STATE.backend);
   await tf.ready();
   detector = await createDetector();
-  const canvas = document.getElementById('output');
-  canvas.width = camera.video.width;
-  canvas.height = camera.video.height;
-  useGpuRenderer = (urlParams.get('gpuRenderer') === 'true') && isWebGPU;
-  if (useGpuRenderer) {
-    renderer = new RendererWebGPU(canvas, importVideo);
-  } else {
-    renderer = new RendererCanvas2d(canvas);
-  }
+  const canvas_frame = document.getElementById('frame');
+  canvas_frame.width = camera.frame.width;
+  canvas_frame.height = camera.frame.height;
+
+  const canvas_subframes = document.getElementById('subframes');
+  canvas_subframes.width = camera.subframes.width;
+  canvas_subframes.height = camera.subframes.height;
+
+  renderer = new RendererCanvas2d(canvas_frame, canvas_subframes);
 
   renderPrediction();
 };

@@ -35,52 +35,20 @@ export async function setupDatGui(urlParams) {
   const gui = new dat.GUI({width: 300});
   gui.domElement.id = 'gui';
 
-  // The camera folder contains options for video settings.
-  const cameraFolder = gui.addFolder('Camera');
-  const fpsController = cameraFolder.add(params.STATE.camera, 'targetFPS');
-  fpsController.onFinishChange((_) => {
-    params.STATE.isTargetFPSChanged = true;
-  });
-  const sizeController = cameraFolder.add(
-      params.STATE.camera, 'sizeOption', Object.keys(params.VIDEO_SIZE));
-  sizeController.onChange(_ => {
-    params.STATE.isSizeOptionChanged = true;
-  });
-  cameraFolder.open();
-
   // The model folder contains options for model selection.
   const modelFolder = gui.addFolder('Model');
 
+  gui.close();
 
-  // const model = urlParams.get('model');
   const model = 'movenet';
   let type = 'multipose'
 
-  // let type = urlParams.get('type');
-
   const backendFromURL = urlParams.get('backend');
 
-  switch (model) {
-    case 'posenet':
-      params.STATE.model = posedetection.SupportedModels.PoseNet;
-      break;
-    case 'movenet':
-      params.STATE.model = posedetection.SupportedModels.MoveNet;
-      if (type !== 'lightning' && type !== 'thunder' && type !== 'multipose') {
-        // Nulify invalid value.
-        type = null;
-      }
-      break;
-    case 'blazepose':
-      params.STATE.model = posedetection.SupportedModels.BlazePose;
-      if (type !== 'full' && type !== 'lite' && type !== 'heavy') {
-        // Nulify invalid value.
-        type = null;
-      }
-      break;
-    default:
-      alert(`${urlParams.get('model')}`);
-      break;
+  params.STATE.model = posedetection.SupportedModels.MoveNet;
+  if (type !== "lightning" && type !== "thunder" && type !== "multipose") {
+    // Nulify invalid value.
+    type = null;
   }
 
   const modelController = modelFolder.add(
@@ -143,19 +111,7 @@ function showModelConfigs(folderController, type) {
             .__controllers[folderController.__controllers.length - 1]);
   }
 
-  switch (params.STATE.model) {
-    case posedetection.SupportedModels.PoseNet:
-      addPoseNetControllers(folderController);
-      break;
-    case posedetection.SupportedModels.MoveNet:
-      addMoveNetControllers(folderController, type);
-      break;
-    case posedetection.SupportedModels.BlazePose:
-      addBlazePoseControllers(folderController, type);
-      break;
-    default:
-      alert(`Model ${params.STATE.model} is not supported.`);
-  }
+  addMoveNetControllers(folderController, type);
 }
 
 // The PoseNet model config folder contains options for PoseNet config
@@ -217,30 +173,6 @@ function addMoveNetControllers(modelConfigFolder, type) {
     // changing models.
     params.STATE.isModelChanged = true;
   })
-}
-
-// The BlazePose model config folder contains options for BlazePose config
-// settings.
-function addBlazePoseControllers(modelConfigFolder, type) {
-  params.STATE.modelConfig = {...params.BLAZEPOSE_CONFIG};
-  params.STATE.modelConfig.type = type != null ? type : 'full';
-
-  const typeController = modelConfigFolder.add(
-      params.STATE.modelConfig, 'type', ['lite', 'full', 'heavy']);
-  typeController.onChange(_ => {
-    // Set isModelChanged to true, so that we don't render any result during
-    // changing models.
-    params.STATE.isModelChanged = true;
-  });
-
-  modelConfigFolder.add(params.STATE.modelConfig, 'scoreThreshold', 0, 1);
-
-  const render3DController =
-      modelConfigFolder.add(params.STATE.modelConfig, 'render3D');
-  render3DController.onChange(render3D => {
-    document.querySelector('#scatter-gl-container').style.display =
-        render3D ? 'inline-block' : 'none';
-  });
 }
 
 /**

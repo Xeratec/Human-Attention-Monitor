@@ -16,7 +16,8 @@
     "@tensorflow/tfjs-backend-webgpu": "^4.10.0",
     "@tensorflow/tfjs-converter": "^4.10.0",
     "@tensorflow/tfjs-core": "^4.10.0",
-    "scatter-gl": "0.0.8"
+    "scatter-gl": "0.0.8",
+    "websocket": "^1.0.35"
   },
   "scripts": {
     "watch": "cross-env NODE_ENV=development parcel index.html --no-hmr --open",
