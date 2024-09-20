@@ -43,9 +43,11 @@ def extract_sub_images(img, n=2):
         # y = random.randint(0, height - 100)
         x = 00
         y = 20
+        width = 150
+        height = 200
 
         # Define the region of interest (ROI) for the sub-image
-        roi = (x, y, x + 150, y + 200)
+        roi = (x, y, x + width, y + height)
 
         # Crop the sub-image using the ROI
         sub_img = img.crop(roi)
@@ -59,7 +61,7 @@ def extract_sub_images(img, n=2):
 
         # Store the Base64-encoded sub-image in the list
         sub_images.append(sub_img_base64)
-        bounding_boxes.append(roi)
+        bounding_boxes.append((x, y, x + width, y + height))
 
     return sub_images, bounding_boxes
 

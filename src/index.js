@@ -161,13 +161,19 @@ async function renderResult() {
     // Detectors can throw errors, for example when using custom URLs that
     // contain a model that doesn't provide the expected output.
     try {
+      // poses = await detector.estimatePoses(camera.frame, {
+      //   maxPoses: STATE.modelConfig.maxPoses,
+      //   flipHorizontal: false,
+      // });
+      // console.log(camera.frame)
       for (let i = 0; i < camera.subframes.images.length; i++) {
         const subImage = camera.subframes.images[i];
+        // console.log(subImage)
         const pose = await detector.estimatePoses(subImage, {
-          maxPoses: STATE.modelConfig.maxPoses,
+          maxPoses: 1,
           flipHorizontal: false,
         });
-        if (pose.length > 1) {
+        if (pose.length > 0 ) {
           // Push all poses in the subimage to the poses array and transform the keypoints to the original image coordinates
           pose.map((p) => {
             p.keypoints.map((keypoint) => {
@@ -321,12 +327,8 @@ async function app() {
   await tf.ready();
   detector = await createDetector();
   const canvas_frame = document.getElementById('frame');
-  canvas_frame.width = camera.frame.width;
-  canvas_frame.height = camera.frame.height;
 
   const canvas_subframes = document.getElementById('subframes');
-  canvas_subframes.width = camera.subframes.width;
-  canvas_subframes.height = camera.subframes.height;
 
   renderer = new RendererCanvas2d(canvas_frame, canvas_subframes);
 

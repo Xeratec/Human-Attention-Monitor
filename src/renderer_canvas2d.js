@@ -50,23 +50,28 @@ const COLOR_PALETTE = [
 ];
 export class RendererCanvas2d {
   constructor(canvas_frame, canvas_subframes) {
-    this.canvas_frame = canvas_frame.getContext('2d');
-    this.canvas_subframes = canvas_subframes.getContext('2d');
+    this.canvas2d_frame = canvas_frame.getContext('2d');
+    this.canvas2d_subframes = canvas_subframes.getContext('2d');
+    this.canvas_frame = canvas_frame
     this.canvasContainer = document.querySelector(".canvas-wrapper");
-    this.videoWidth = canvas_frame.width;
-    this.videoHeight = canvas_frame.height;
     this.filteredAttentionScore = 0;
+
+   
   }
 
   flip(videoWidth, videoHeight) {
     // Because the image from camera is mirrored, need to flip horizontally.
-    this.canvas_frame.translate(videoWidth, 0);
-    this.canvas_frame.scale(-1, 1);
+    this.canvas2d_frame.translate(videoWidth, 0);
+    this.canvas2d_frame.scale(-1, 1);
   }
 
   draw(rendererParams) {
     const [camera, poses, isModelChanged] = rendererParams;
     this.drawCtx(camera);
+
+    this.videoWidth = this.canvas_frame.width;
+    this.videoHeight = this.canvas_frame.height;
+
 
     // The null check makes sure the UI is not in the middle of changing to a
     // different model. If during model change, the result is from an old model,
@@ -76,11 +81,13 @@ export class RendererCanvas2d {
       this.drawResults(poses);
     } else {
       this.drawGlobalAttention([])
+      // Slowly fade out the attention bar when no poses are detected
+      this.filteredAttentionScore *= 0.9;
     }
   }
 
   drawCtx(camera) {
-    this.canvas_frame.drawImage(
+    this.canvas2d_frame.drawImage(
       camera.frame,
       0,
       0,
@@ -90,32 +97,39 @@ export class RendererCanvas2d {
 
     // Draw subimages below the main image in a row with 10px spacing
 
+    let width = 0;
     for (let i = 0; i < camera.subframes.images.length; i++) {
       const subImg = camera.subframes.images[i];
-      this.canvas_subframes.drawImage(
+
+      this.canvas2d_subframes.drawImage(
         subImg,
-        i * (subImg.width + 0),
+        width,
         0,
         subImg.width,
         subImg.height
       );
 
+      width += subImg.width;
+
       // Draw bounding boxes in original image saved in subImg.boundingBox
-      this.canvas_frame.strokeStyle = "red";
-      this.canvas_frame.lineWidth = 2;
-      this.canvas_frame.strokeRect(
+      this.canvas2d_frame.strokeStyle = "red";
+      this.canvas2d_frame.lineWidth = 2;
+      this.canvas2d_frame.strokeRect(
         camera.subframes.boundingBoxes[i][0],
         camera.subframes.boundingBoxes[i][1],
-        camera.subframes.boundingBoxes[i][2] -
-          camera.subframes.boundingBoxes[i][0],
-        camera.subframes.boundingBoxes[i][3] -
-          camera.subframes.boundingBoxes[i][1]
+        camera.subframes.boundingBoxes[i][2],
+        camera.subframes.boundingBoxes[i][3]
       );
+
+      // Print global attention score
+      this.canvas2d_frame.font = '20px Arial';
+      this.canvas2d_frame.fillStyle = 'red';
+      this.canvas2d_frame.fillText(`Global Attention: ${this.filteredAttentionScore.toFixed(0)} %`, 10, 30);
     }
   }
 
   clearCtx() {
-    this.canvas_frame.clearRect(0, 0, this.videoWidth, this.videoHeight);
+    this.canvas2d_frame.clearRect(0, 0, this.videoWidth, this.videoHeight);
   }
 
   filterAttntionScore(poses) {
@@ -123,7 +137,7 @@ export class RendererCanvas2d {
     const totalAttentionScore = poses.reduce((total, pose) => total + pose.attentionScore, 0);
     const averageAttentionScore =  totalAttentionScore / poses.length;
 
-    const filterConstant = 0.95;
+    const filterConstant = 0.8;
     this.filteredAttentionScore = filterConstant * this.filteredAttentionScore + (1 - filterConstant) * averageAttentionScore
     return this.filteredAttentionScore
   }
@@ -142,8 +156,8 @@ export class RendererCanvas2d {
 
   drawGlobalAttention(poses) {
     const averageAttentionScore = this.filteredAttentionScore;
-    this.canvas_frame.font = '20px Arial';
-    this.canvas_frame.fillStyle = 'red';
+    this.canvas2d_frame.font = '20px Arial';
+    this.canvas2d_frame.fillStyle = 'red';
     // this.ctx.fillText(`Average Attention: ${averageAttentionScore.toFixed(0)} %`, 10, 30);
 
     // Define bar dimensions
@@ -155,8 +169,8 @@ export class RendererCanvas2d {
 
     // Draw the bar outline
     // Draw background of the bar (gray)
-    this.canvas_frame.fillStyle = '#ccc';
-    this.canvas_frame.fillRect(barX, barY, barWidth, barHeight);
+    this.canvas2d_frame.fillStyle = '#ccc';
+    this.canvas2d_frame.fillRect(barX, barY, barWidth, barHeight);
 
     if (poses == undefined) {
       return;
@@ -167,8 +181,8 @@ export class RendererCanvas2d {
     // calcualte color based on attention score form red to green
     const r = Math.floor(255 * (1 - averageAttentionScore / 100));
     const g = Math.floor(255 * (averageAttentionScore / 100));
-    this.canvas_frame.fillStyle = `rgb(${r}, ${g}, 0)`;
-    this.canvas_frame.fillRect(barX, barY, attentionBarWidth, barHeight);
+    this.canvas2d_frame.fillStyle = `rgb(${r}, ${g}, 0)`;
+    this.canvas2d_frame.fillRect(barX, barY, attentionBarWidth, barHeight);
 
     // // Draw a border around the bar
     // this.ctx.strokeStyle = 'black';
@@ -194,20 +208,20 @@ export class RendererCanvas2d {
   drawKeypoints(keypoints) {
     const keypointInd =
         posedetection.util.getKeypointIndexBySide(params.STATE.model);
-    this.canvas_frame.fillStyle = 'Red';
-    this.canvas_frame.strokeStyle = 'White';
-    this.canvas_frame.lineWidth = params.DEFAULT_LINE_WIDTH;
+    this.canvas2d_frame.fillStyle = 'Red';
+    this.canvas2d_frame.strokeStyle = 'White';
+    this.canvas2d_frame.lineWidth = params.DEFAULT_LINE_WIDTH;
 
     for (const i of keypointInd.middle) {
       this.drawKeypoint(keypoints[i]);
     }
 
-    this.canvas_frame.fillStyle = 'Green';
+    this.canvas2d_frame.fillStyle = 'Green';
     for (const i of keypointInd.left) {
       this.drawKeypoint(keypoints[i]);
     }
 
-    this.canvas_frame.fillStyle = 'Orange';
+    this.canvas2d_frame.fillStyle = 'Orange';
     for (const i of keypointInd.right) {
       this.drawKeypoint(keypoints[i]);
     }
@@ -226,8 +240,8 @@ export class RendererCanvas2d {
     if (score >= scoreThreshold) {
       const circle = new Path2D();
       circle.arc(keypoint.x, keypoint.y, params.DEFAULT_RADIUS, 0, 2 * Math.PI);
-      this.canvas_frame.fill(circle);
-      this.canvas_frame.stroke(circle);
+      this.canvas2d_frame.fill(circle);
+      this.canvas2d_frame.stroke(circle);
     }
   }
 
@@ -243,8 +257,8 @@ export class RendererCanvas2d {
     const tilt = orientation.tilt;
 
     // Draw yaw and mirror it
-    this.canvas_frame.font = '20px Arial';
-    this.canvas_frame.fillStyle = 'red';
+    this.canvas2d_frame.font = '20px Arial';
+    this.canvas2d_frame.fillStyle = 'red';
     // this.ctx.fillText(`Yaw: ${yaw.toFixed(0)} degrees`, nose.x, nose.y);
     // this.ctx.fillText(`Tilt: ${tilt.toFixed(0)} degrees`, nose.x, nose.y +
     //     30);
@@ -259,9 +273,9 @@ export class RendererCanvas2d {
     const color = params.STATE.modelConfig.enableTracking && poseId != null ?
         COLOR_PALETTE[poseId % 20] :
         'White';
-    this.canvas_frame.fillStyle = color;
-    this.canvas_frame.strokeStyle = color;
-    this.canvas_frame.lineWidth = params.DEFAULT_LINE_WIDTH;
+    this.canvas2d_frame.fillStyle = color;
+    this.canvas2d_frame.strokeStyle = color;
+    this.canvas2d_frame.lineWidth = params.DEFAULT_LINE_WIDTH;
 
     posedetection.util.getAdjacentPairs(params.STATE.model).forEach(([
                                                                       i, j
@@ -279,10 +293,10 @@ export class RendererCanvas2d {
       const scoreThreshold = params.STATE.modelConfig.scoreThreshold || 0;
 
       if (score1 >= scoreThreshold && score2 >= scoreThreshold) {
-        this.canvas_frame.beginPath();
-        this.canvas_frame.moveTo(kp1.x, kp1.y);
-        this.canvas_frame.lineTo(kp2.x, kp2.y);
-        this.canvas_frame.stroke();
+        this.canvas2d_frame.beginPath();
+        this.canvas2d_frame.moveTo(kp1.x, kp1.y);
+        this.canvas2d_frame.lineTo(kp2.x, kp2.y);
+        this.canvas2d_frame.stroke();
       }
     });
   }

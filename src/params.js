@@ -26,7 +26,7 @@ export const VIDEO_SIZE = {
   '360 X 270': {width: 360, height: 270}
 };
 export const STATE = {
-  websocket : {wsUrl: "ws://localhost:2424"},
+  websocket : {wsUrl: "ws://192.168.137.172:2424"},
   camera: {targetFPS: 60, sizeOption: '640 X 480'},
   backend: '',
   flags: {},
