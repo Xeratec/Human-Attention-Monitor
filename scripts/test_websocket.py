@@ -1,36 +1,37 @@
 import os
+import cv2
 import base64
 import asyncio
 import websockets
-from PIL import Image
-from io import BytesIO
 import json
 import random
 from pprint import pprint
 
-# Path to the image file
-image_path = "img/images.jpeg"  # Replace with your image path
+cam = cv2.VideoCapture(0)
 
 # Function to load, resize, and encode the image in Base64
-def process_image(image_path):
-    # Open the image file
-    with Image.open(image_path) as img:
-        # Resize the image
-        img_resized = img.resize((320, 270))
+def process_image(width = 800):
+    # Capture the image from the webcam
+    result, img = cam.read()
 
-        # Save the resized image to a bytes buffer in JPEG format
-        buffered = BytesIO()
-        img_resized.save(buffered, format="JPEG")
+    h, w, _ = img.shape
 
-        # Encode the image in Base64
-        img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    # Crop the image to a width while maintaining the aspect ratio
+    img_resized = cv2.resize(img, (width, int(h * width / w)))
+
+    # Save the resized image to a bytes buffer in JPEG format
+    result, buffered = cv2.imencode('.jpg', img_resized)
+
+    # Encode the image in Base64
+    img_base64 = base64.b64encode(buffered).decode('utf-8')
 
     return img_resized, img_base64
 
 # Function to extract n random sub-images from the full image
 def extract_sub_images(img, n=2):
+
     # Get the width and height of the full image
-    width, height = img.size
+    height, width, _ = img.shape
 
     # Initialize list to store sub-images and bounding boxes
     sub_images = []
@@ -41,23 +42,19 @@ def extract_sub_images(img, n=2):
         # Generate random coordinates for the top-left corner of the sub-image
         # x = random.randint(0, width - 100)
         # y = random.randint(0, height - 100)
-        x = 00
+        x = 20
         y = 20
-        width = 150
-        height = 200
-
-        # Define the region of interest (ROI) for the sub-image
-        roi = (x, y, x + width, y + height)
+        width = int(width * 0.5)
+        height = int(height * 0.8)
 
         # Crop the sub-image using the ROI
-        sub_img = img.crop(roi)
+        sub_img = img[y:y + height, x:x + width]
 
         # Save the sub-image to a bytes buffer in JPEG format
-        buffered = BytesIO()
-        sub_img.save(buffered, format="JPEG")
+        result, buffered = cv2.imencode('.jpg', sub_img)
 
         # Encode the sub-image in Base64
-        sub_img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        sub_img_base64 = base64.b64encode(buffered).decode('utf-8')
 
         # Store the Base64-encoded sub-image in the list
         sub_images.append(sub_img_base64)
@@ -72,7 +69,7 @@ async def send_image(websocket, path):
         print("Client connected")
 
         # Process the image and get the Base64-encoded string
-        img, img_base64 = process_image(image_path)
+        img, img_base64 = process_image()
 
         # Extract n random sub-images from the full image
         sub_img_base64, boundingBoxes = extract_sub_images(img, n=1)
@@ -92,20 +89,15 @@ async def send_image(websocket, path):
         # Encode image in JSON format as a string
         payload = json.dumps(img_dict)
 
-        # print("Sending image...")
-        # pprint(img_dict)
-
         # Send the Base64-encoded image string to the client
         await websocket.send(payload)
         print("Image sent successfully.")
-
-        await asyncio.sleep(1)
 
 # Start the WebSocket server on localhost:2424
 async def main():
     server = await websockets.serve(send_image, "localhost", 2424)
     print("WebSocket server started on ws://localhost:2424")
-    
+
     await server.wait_closed()
 
 # Run the WebSocket server
