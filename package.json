@@ -2,7 +2,6 @@
   "name": "human_attention_monitor",
   "version": "0.0.1",
   "description": "Proof of concept human attention monitor for CPS24",
-  "main": "index.js",
   "license": "Apache-2.0",
   "private": true,
   "engines": {
@@ -20,8 +19,10 @@
     "websocket": "^1.0.35"
   },
   "scripts": {
-    "watch": "cross-env NODE_ENV=development parcel index.html --no-hmr --open",
-    "build": "cross-env NODE_ENV=production parcel build index.html --public-url ./",
+    "watch": "cross-env NODE_ENV=development parcel index_websocket.html --no-hmr --open",
+    "watch-standalone": "cross-env NODE_ENV=development parcel index_standalone.html --no-hmr --open",
+    "build": "cross-env NODE_ENV=production parcel build index_websocket.html --public-url ./",
+    "build-standalone": "cross-env NODE_ENV=production parcel build index_standalone.html --public-url ./",
     "lint": "eslint .",
     "link-core": "yalc link @tensorflow/tfjs-core",
     "link-webgl": "yalc link @tensorflow/tfjs-backend-webgl"

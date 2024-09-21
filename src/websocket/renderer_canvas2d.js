@@ -15,9 +15,8 @@
  * =============================================================================
  */
 import * as posedetection from '@tensorflow-models/pose-detection';
-import * as scatter from 'scatter-gl';
 
-import * as params from './params';
+import * as params from '../params';
 
 // These anchor points allow the pose pointcloud to resize according to its
 // position in the input.
@@ -56,7 +55,7 @@ export class RendererCanvas2d {
     this.canvasContainer = document.querySelector(".canvas-wrapper");
     this.filteredAttentionScore = 0;
 
-   
+
   }
 
   flip(videoWidth, videoHeight) {

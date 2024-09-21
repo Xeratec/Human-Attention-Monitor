@@ -38,17 +38,31 @@ export async function setupDatGui(urlParams) {
   // The model folder contains options for model selection.
   const modelFolder = gui.addFolder('Model');
 
-  gui.close();
-
-  const model = 'movenet';
-  let type = 'multipose'
-
+  const model = urlParams.get('model');
+  let type = urlParams.get('type');
   const backendFromURL = urlParams.get('backend');
 
-  params.STATE.model = posedetection.SupportedModels.MoveNet;
-  if (type !== "lightning" && type !== "thunder" && type !== "multipose") {
-    // Nulify invalid value.
-    type = null;
+  switch (model) {
+    case 'posenet':
+      params.STATE.model = posedetection.SupportedModels.PoseNet;
+      break;
+    case 'movenet':
+      params.STATE.model = posedetection.SupportedModels.MoveNet;
+      if (type !== 'lightning' && type !== 'thunder' && type !== 'multipose') {
+        // Nulify invalid value.
+        type = null;
+      }
+      break;
+    case 'blazepose':
+      params.STATE.model = posedetection.SupportedModels.BlazePose;
+      if (type !== 'full' && type !== 'lite' && type !== 'heavy') {
+        // Nulify invalid value.
+        type = null;
+      }
+      break;
+    default:
+      alert(`${urlParams.get('model')}`);
+      break;
   }
 
   const modelController = modelFolder.add(
@@ -111,7 +125,19 @@ function showModelConfigs(folderController, type) {
             .__controllers[folderController.__controllers.length - 1]);
   }
 
-  addMoveNetControllers(folderController, type);
+  switch (params.STATE.model) {
+    case posedetection.SupportedModels.PoseNet:
+      addPoseNetControllers(folderController);
+      break;
+    case posedetection.SupportedModels.MoveNet:
+      addMoveNetControllers(folderController, type);
+      break;
+    case posedetection.SupportedModels.BlazePose:
+      addBlazePoseControllers(folderController, type);
+      break;
+    default:
+      alert(`Model ${params.STATE.model} is not supported.`);
+  }
 }
 
 // The PoseNet model config folder contains options for PoseNet config
@@ -173,6 +199,30 @@ function addMoveNetControllers(modelConfigFolder, type) {
     // changing models.
     params.STATE.isModelChanged = true;
   })
+}
+
+// The BlazePose model config folder contains options for BlazePose config
+// settings.
+function addBlazePoseControllers(modelConfigFolder, type) {
+  params.STATE.modelConfig = {...params.BLAZEPOSE_CONFIG};
+  params.STATE.modelConfig.type = type != null ? type : 'full';
+
+  const typeController = modelConfigFolder.add(
+      params.STATE.modelConfig, 'type', ['lite', 'full', 'heavy']);
+  typeController.onChange(_ => {
+    // Set isModelChanged to true, so that we don't render any result during
+    // changing models.
+    params.STATE.isModelChanged = true;
+  });
+
+  modelConfigFolder.add(params.STATE.modelConfig, 'scoreThreshold', 0, 1);
+
+  const render3DController =
+      modelConfigFolder.add(params.STATE.modelConfig, 'render3D');
+  render3DController.onChange(render3D => {
+    document.querySelector('#scatter-gl-container').style.display =
+        render3D ? 'inline-block' : 'none';
+  });
 }
 
 /**

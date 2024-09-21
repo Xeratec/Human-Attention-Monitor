@@ -27,7 +27,8 @@ limitations under the License.
       position: relative;
       margin: 0;
     }
-    #canvas-wrapper {
+    #canvas-wrapper,
+    #scatter-gl-container {
       position: relative;
     }
   </style>
@@ -36,16 +37,23 @@ limitations under the License.
   <div id="stats"></div>
   <div id="main">
     <div class="container">
-      <img id="fullImage"></img>
       <div class="canvas-wrapper">
-        <canvas id="frame"></canvas>
-        <canvas id="subframes"></canvas>
+        <canvas id="output"></canvas>
+        <video id="video" playsinline style="
+          -webkit-transform: scaleX(-1);
+          transform: scaleX(-1);
+          visibility: hidden;
+          width: auto;
+          height: auto;
+          ">
+        </video>
       </div>
+      <div id="scatter-gl-container"></div>
     </div>
   </div>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
-<script src="src/index.js"></script>
+<script src="src/standalone/index.js"></script>
 
 </html>

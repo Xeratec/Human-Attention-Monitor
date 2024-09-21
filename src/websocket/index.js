@@ -30,10 +30,10 @@ import * as posedetection from '@tensorflow-models/pose-detection';
 
 import {Camera} from './websocket';
 import {RendererCanvas2d} from './renderer_canvas2d';
-import {setupDatGui} from './option_panel';
-import {STATE} from './params';
-import {setupStats} from './stats_panel';
-import {setBackendAndEnvFlags} from './util';
+import {setupDatGui} from '../option_panel';
+import {STATE} from '../params';
+import {setupStats} from '../stats_panel';
+import {setBackendAndEnvFlags} from '../util';
 
 let detector, camera, stats;
 let startInferenceTime, numInferences = 0;
@@ -87,12 +87,6 @@ async function createDetector() {
 }
 
 async function checkGuiUpdate() {
-  if (STATE.isTargetFPSChanged || STATE.isSizeOptionChanged) {
-    camera = await Camera.setupCamera(STATE.websocket);
-    STATE.isTargetFPSChanged = false;
-    STATE.isSizeOptionChanged = false;
-  }
-
   if (STATE.isModelChanged || STATE.isFlagChanged || STATE.isBackendChanged) {
     STATE.isModelChanged = true;
 
@@ -181,12 +175,12 @@ async function renderResult() {
               keypoint.y += camera.subframes.boundingBoxes[i][1];
             });
             poses.push(p);
-            
+
           });
         }
       }
       // console.log(poses);
-          
+
     } catch (error) {
       detector.dispose();
       detector = null;
@@ -311,10 +305,11 @@ async function renderPrediction() {
 async function app() {
   // Gui content will change depending on which model is in the query string.
   const urlParams = new URLSearchParams(window.location.search);
-  // if (!urlParams.has('model')) {
-  //   alert('Cannot find model in the query string.');
-  //   return;
-  // }
+  if (!urlParams.has('model')) {
+    // Forward to moveNet by default
+    urlParams.set('model', 'movenet');
+    window.location.search = urlParams;
+  }
   await setupDatGui(urlParams);
 
   stats = setupStats();

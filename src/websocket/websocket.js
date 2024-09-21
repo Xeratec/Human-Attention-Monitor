@@ -1,4 +1,4 @@
-import * as params from './params';
+import * as params from '../params';
 var W3CWebSocket = require('websocket').w3cwebsocket;
 
 
